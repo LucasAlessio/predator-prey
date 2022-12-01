@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigEnum } from "../enum/ConfigEnum";
 import { TypeAgentEnum } from "../enum/TypeAgentEnum";
 import { ArrayHelper } from "../helpers/ArrayHelper";
@@ -8,17 +8,31 @@ const EnviromentContext = createContext<TEnviromentData>({} as TEnviromentData);
 
 const SIZE = 30;
 
+const verifier: boolean[][] = Array.from({ length: SIZE }, () => {
+	return Array.from({ length: SIZE }, () => false)
+});
+
 export const EnviromentProvider = ({ children }: EnviromentProviderProps) => {
-	const AMOUNT_PREYS = useRef<number>(1);
-	const AMOUNT_PREDATORS = useRef<number>(25);
+	const AMOUNT_PREYS = useRef<number>(3);
+	const AMOUNT_PREDATORS = useRef<number>(397);
 
-	const positions = useRef<TPositions>(
-		Array.from({ length: AMOUNT_PREYS.current + AMOUNT_PREDATORS.current }, () => {
-			return [Math.floor(Math.random() * SIZE), Math.floor(Math.random() * SIZE)] as TPositions[number];
-		})
-	);
+	const initial = useMemo(() => {
+		return Array.from({ length: AMOUNT_PREYS.current + AMOUNT_PREDATORS.current }, () => {
+			let pos = [Math.floor(Math.random() * SIZE), Math.floor(Math.random() * SIZE)];
+		
+			while(verifier[pos[0]][pos[1]] === true) {
+				pos = [Math.floor(Math.random() * SIZE), Math.floor(Math.random() * SIZE)];
+			}
+		
+			verifier[pos[0]][pos[1]] = true;
+		
+			return pos as TPositions[number];
+		});
+	}, []);
 
-	const [enviroment, setEnviroment] = useState<TEnviroment>(() => makeEnviroment(positions.current, AMOUNT_PREYS.current));
+	const positions = useRef<TPositions>(initial);
+
+	const [enviroment, setEnviroment] = useState<TEnviroment>(() => updateEnviroment(positions.current, AMOUNT_PREYS.current));
 	const [isPlaying, setIsPlaying] = useState(false);
 
 	const togglePlay = useCallback(() => {
@@ -34,7 +48,7 @@ export const EnviromentProvider = ({ children }: EnviromentProviderProps) => {
 			
 			setEnviroment(newEnviroment);
 			positions.current = newPositions;
-		}, 500);
+		}, 150);
 
 		return () => {
 			clearTimeout(timeout);
@@ -56,7 +70,7 @@ export const useEnviroment = () => {
 	return useContext<TEnviromentData>(EnviromentContext);
 }
 
-const makeEnviroment = (positions: TPositions, amountPreys: number, enviroment?: TEnviroment): TEnviroment => {
+const updateEnviroment = (positions: TPositions, amountPreys: number, enviroment?: TEnviroment): TEnviroment => {
 	const a: TEnviroment = Array.from({ length: SIZE }, (_, line) => {
 		return Array.from({ length: SIZE }, (_, col) => ({
 			agent: 0,
@@ -64,8 +78,8 @@ const makeEnviroment = (positions: TPositions, amountPreys: number, enviroment?:
 		}))
 	});
 
-	positions.forEach(([i, j], index) => {
-		a[i][j].agent = index >= amountPreys ? TypeAgentEnum.PREDATOR : TypeAgentEnum.PREY;
+	positions.forEach(([ line, col ], index) => {
+		a[line][col].agent = index >= amountPreys ? TypeAgentEnum.PREDATOR : TypeAgentEnum.PREY;
 	});
 
 	return a;
@@ -93,18 +107,41 @@ const move = (enviroment: TEnviroment, positions: TPositions, amountPreys: numbe
 		const moves = calculatePossibleMoves(enviroment, enviroment[line][col].agent, [line, col]);
 
 		if (moves.length === 0) {
+			// checkPositionsTable[line][col] = index;
 			return;
 		}
 
 		const move = moves[Math.floor(Math.random() * moves.length)];
-
 		const calculatedPos = [calculateEnviromentPos(line + move[0]), calculateEnviromentPos(col + move[1])];
-		const agentNumber = checkPositionsTable[calculatedPos[0]][calculatedPos[1]];
+		let agentMoved = checkPositionsTable[calculatedPos[0]][calculatedPos[1]];
 
-		if (agentNumber !== false) {
-			newPositions[agentNumber] = positions[agentNumber];
-			newPositions[index] = positions[index];
+		if (agentMoved !== false) {
+			newPositions[agentMoved] = positions[agentMoved];
 
+			let backtrack = checkPositionsTable[positions[agentMoved][0]][positions[agentMoved][1]];
+			let recalculatedPos: number[] = [];
+
+			while (backtrack !== false && !recalculatedPos.includes(backtrack)) {
+				recalculatedPos.push(backtrack);
+				newPositions[backtrack] = positions[backtrack];	
+				const newBacktrack = checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]];
+				checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]] = backtrack;
+				backtrack = newBacktrack;
+			}
+
+			backtrack = checkPositionsTable[line][col];
+			recalculatedPos = [];
+
+			while (backtrack !== false && !recalculatedPos.includes(backtrack)) {
+				recalculatedPos.push(backtrack);
+				newPositions[backtrack] = positions[backtrack];	
+				const newBacktrack = checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]];
+				checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]] = backtrack;
+				backtrack = newBacktrack;
+			}
+
+			checkPositionsTable[newPositions[agentMoved][0]][newPositions[agentMoved][1]] = agentMoved;
+			checkPositionsTable[line][col] = index;
 			return;
 		}
 
@@ -114,7 +151,7 @@ const move = (enviroment: TEnviroment, positions: TPositions, amountPreys: numbe
 
 	return {
 		positions: newPositions,
-		enviroment: makeEnviroment(newPositions, amountPreys, enviroment),
+		enviroment: updateEnviroment(newPositions, amountPreys, enviroment),
 	}
 }
 
@@ -156,13 +193,6 @@ const calculatePossibleMoves = (enviroment: TEnviroment, agent: 0 | TAgent, pos:
 }
 
 const calculatePossibleMovesPrey = (enviroment: TEnviroment, agent: 0 | TAgent, pos: TCoord): TCoord[] => {
-	const moves = {
-		top: [-1, 0],
-		right: [0, 1],
-		bottom: [1, 0],
-		left: [0, -1]
-	}
-
 	const adjacents: Record<TDirections, TDirections[]> = {
 		top: ["right", "left"],
 		right: ["top", "bottom"],
@@ -177,7 +207,7 @@ const calculatePossibleMovesPrey = (enviroment: TEnviroment, agent: 0 | TAgent, 
 		left: "right",
 	}
 
-	const blockDirs = Object.entries(moves).reduce<TDirections[]>((acc, [ direction, [ line, col ] ]) => {
+	const blockDirs = Object.entries(ConfigEnum.MOVES).reduce<TDirections[]>((acc, [ direction, [ line, col ] ]) => {
 		const calculatedPos = [calculateEnviromentPos(pos[0] + line), calculateEnviromentPos(pos[1] + col)];
 
 		if (enviroment[calculatedPos[0]][calculatedPos[1]].agent === TypeAgentEnum.PREDATOR) {
@@ -188,18 +218,18 @@ const calculatePossibleMovesPrey = (enviroment: TEnviroment, agent: 0 | TAgent, 
 	}, []);
 
 	if (blockDirs.length === 0) {
-		return Object.values(moves) as TCoord[];
+		return Object.values(ConfigEnum.MOVES) as TCoord[];
 	}
 
 	const possibleMoves = blockDirs.reduce<TCoord[]>((_, direction) => {
-		const moveOpposite = moves[opposites[direction]];
+		const moveOpposite = ConfigEnum.MOVES[opposites[direction]];
 		const calculatedPos = [calculateEnviromentPos(pos[0] + moveOpposite[0]), calculateEnviromentPos(pos[1] + moveOpposite[1])];
 
 		if (enviroment[calculatedPos[0]][calculatedPos[1]].agent !== TypeAgentEnum.PREDATOR) {
 			return [moveOpposite] as TCoord[];
 		} else {
 			return adjacents[direction].reduce<TCoord[]>((acc, adjacent) => {
-				const moveAdjacent = moves[adjacent];
+				const moveAdjacent = ConfigEnum.MOVES[adjacent];
 
 				const calculatedPos = [calculateEnviromentPos(pos[0] + moveAdjacent[0]), calculateEnviromentPos(pos[1] + moveAdjacent[1])];
 
@@ -216,17 +246,10 @@ const calculatePossibleMovesPrey = (enviroment: TEnviroment, agent: 0 | TAgent, 
 }
 
 const calculatePossibleMovesPredator = (enviroment: TEnviroment, agent: 0 | TAgent, pos: TCoord): TCoord[] => {
-	const moves = {
-		top: [-1, 0],
-		right: [0, 1],
-		bottom: [1, 0],
-		left: [0, -1]
-	}
-
 	let sightedPrey = false;
 	let maxPheronomeIntensity = 0;
 
-	const possibleMoves = Object.entries(moves).reduce<TCoord[]>((acc, [ direction, [ line, col ] ]) => {
+	const possibleMoves = Object.entries(ConfigEnum.MOVES).reduce<TCoord[]>((acc, [ direction, [ line, col ] ]) => {
 		const calculatedPos = [calculateEnviromentPos(pos[0] + line), calculateEnviromentPos(pos[1] + col)];
 
 		if (enviroment[calculatedPos[0]][calculatedPos[1]].agent === TypeAgentEnum.PREY) {
@@ -255,10 +278,5 @@ const calculatePossibleMovesPredator = (enviroment: TEnviroment, agent: 0 | TAge
 		return possibleMoves;
 	}
 
-	return [
-		[-1, 0],
-		[0, 1],
-		[1, 0],
-		[0, -1]
-	] as TCoord[]
+	return Object.values(ConfigEnum.MOVES) as TCoord[];
 }
