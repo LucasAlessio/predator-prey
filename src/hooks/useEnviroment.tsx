@@ -118,26 +118,27 @@ const move = (enviroment: TEnviroment, positions: TPositions, amountPreys: numbe
 		if (agentMoved !== false) {
 			newPositions[agentMoved] = positions[agentMoved];
 
-			let backtrack = checkPositionsTable[positions[agentMoved][0]][positions[agentMoved][1]];
+			let backtracks = [
+				checkPositionsTable[positions[agentMoved][0]][positions[agentMoved][1]],
+				checkPositionsTable[line][col],
+			];
 			let recalculatedPos: number[] = [];
-
-			while (backtrack !== false && !recalculatedPos.includes(backtrack)) {
-				recalculatedPos.push(backtrack);
-				newPositions[backtrack] = positions[backtrack];	
-				const newBacktrack = checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]];
-				checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]] = backtrack;
-				backtrack = newBacktrack;
-			}
-
-			backtrack = checkPositionsTable[line][col];
-			recalculatedPos = [];
-
-			while (backtrack !== false && !recalculatedPos.includes(backtrack)) {
-				recalculatedPos.push(backtrack);
-				newPositions[backtrack] = positions[backtrack];	
-				const newBacktrack = checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]];
-				checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]] = backtrack;
-				backtrack = newBacktrack;
+			
+			while(backtracks.length > 0) {
+				const [backtrack, ...rest] = backtracks;
+				backtracks = rest;
+			
+				if (backtrack !== false) {
+					if (recalculatedPos.includes(backtrack)) {
+						continue;
+					}
+			
+					recalculatedPos.push(backtrack);
+					newPositions[backtrack] = positions[backtrack];
+					const newBacktrack = checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]];
+					checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]] = backtrack;
+					backtracks.push(newBacktrack);
+				}
 			}
 
 			checkPositionsTable[newPositions[agentMoved][0]][newPositions[agentMoved][1]] = agentMoved;
