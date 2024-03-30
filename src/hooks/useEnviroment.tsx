@@ -13,19 +13,19 @@ const verifier: boolean[][] = Array.from({ length: SIZE }, () => {
 });
 
 export const EnviromentProvider = ({ children }: EnviromentProviderProps) => {
-	const AMOUNT_PREYS = useRef<number>(3);
-	const AMOUNT_PREDATORS = useRef<number>(397);
+	const AMOUNT_PREYS = useRef<number>(1);
+	const AMOUNT_PREDATORS = useRef<number>(50);
 
 	const initial = useMemo(() => {
 		return Array.from({ length: AMOUNT_PREYS.current + AMOUNT_PREDATORS.current }, () => {
 			let pos = [Math.floor(Math.random() * SIZE), Math.floor(Math.random() * SIZE)];
-		
-			while(verifier[pos[0]][pos[1]] === true) {
+
+			while (verifier[pos[0]][pos[1]] === true) {
 				pos = [Math.floor(Math.random() * SIZE), Math.floor(Math.random() * SIZE)];
 			}
-		
+
 			verifier[pos[0]][pos[1]] = true;
-		
+
 			return pos as TPositions[number];
 		});
 	}, []);
@@ -43,9 +43,9 @@ export const EnviromentProvider = ({ children }: EnviromentProviderProps) => {
 		if (!isPlaying) return;
 
 		const timeout = setTimeout(() => {
-			const {enviroment: newEnviroment, positions: newPositions} = move(enviroment, positions.current, AMOUNT_PREYS.current);
+			const { enviroment: newEnviroment, positions: newPositions } = move(enviroment, positions.current, AMOUNT_PREYS.current);
 			releasePheronome(newEnviroment, newPositions, AMOUNT_PREYS.current);
-			
+
 			setEnviroment(newEnviroment);
 			positions.current = newPositions;
 		}, 150);
@@ -78,7 +78,7 @@ const updateEnviroment = (positions: TPositions, amountPreys: number, enviroment
 		}))
 	});
 
-	positions.forEach(([ line, col ], index) => {
+	positions.forEach(([line, col], index) => {
 		a[line][col].agent = index >= amountPreys ? TypeAgentEnum.PREDATOR : TypeAgentEnum.PREY;
 	});
 
@@ -123,16 +123,16 @@ const move = (enviroment: TEnviroment, positions: TPositions, amountPreys: numbe
 				checkPositionsTable[line][col],
 			];
 			let recalculatedPos: number[] = [];
-			
-			while(backtracks.length > 0) {
+
+			while (backtracks.length > 0) {
 				const [backtrack, ...rest] = backtracks;
 				backtracks = rest;
-			
+
 				if (backtrack !== false) {
 					if (recalculatedPos.includes(backtrack)) {
 						continue;
 					}
-			
+
 					recalculatedPos.push(backtrack);
 					newPositions[backtrack] = positions[backtrack];
 					const newBacktrack = checkPositionsTable[positions[backtrack][0]][positions[backtrack][1]];
@@ -171,7 +171,7 @@ const releasePheronome = (enviroment: TEnviroment, positions: TPositions, amount
 		});
 	});
 
-	for(let i = amountPreys; i < positions.length; i++) {
+	for (let i = amountPreys; i < positions.length; i++) {
 		fov.forEach(([line, col]) => {
 			const calculatedPos = [calculateEnviromentPos(line + positions[i][0]), calculateEnviromentPos(col + positions[i][1])];
 
@@ -208,7 +208,7 @@ const calculatePossibleMovesPrey = (enviroment: TEnviroment, agent: 0 | TAgent, 
 		left: "right",
 	}
 
-	const blockDirs = Object.entries(ConfigEnum.MOVES).reduce<TDirections[]>((acc, [ direction, [ line, col ] ]) => {
+	const blockDirs = Object.entries(ConfigEnum.MOVES).reduce<TDirections[]>((acc, [direction, [line, col]]) => {
 		const calculatedPos = [calculateEnviromentPos(pos[0] + line), calculateEnviromentPos(pos[1] + col)];
 
 		if (enviroment[calculatedPos[0]][calculatedPos[1]].agent === TypeAgentEnum.PREDATOR) {
@@ -250,24 +250,24 @@ const calculatePossibleMovesPredator = (enviroment: TEnviroment, agent: 0 | TAge
 	let sightedPrey = false;
 	let maxPheronomeIntensity = 0;
 
-	const possibleMoves = Object.entries(ConfigEnum.MOVES).reduce<TCoord[]>((acc, [ direction, [ line, col ] ]) => {
+	const possibleMoves = Object.entries(ConfigEnum.MOVES).reduce<TCoord[]>((acc, [direction, [line, col]]) => {
 		const calculatedPos = [calculateEnviromentPos(pos[0] + line), calculateEnviromentPos(pos[1] + col)];
 
 		if (enviroment[calculatedPos[0]][calculatedPos[1]].agent === TypeAgentEnum.PREY) {
 			if (sightedPrey === false) {
 				sightedPrey = true;
-				return [[ line, col ] as TCoord];
+				return [[line, col] as TCoord];
 			} else {
-				return [...acc, [ line, col ] as TCoord];
+				return [...acc, [line, col] as TCoord];
 			}
 		}
 
 		if (sightedPrey === false) {
 			if (enviroment[calculatedPos[0]][calculatedPos[1]].pheronomeIntensity > 0) {
 				if (enviroment[calculatedPos[0]][calculatedPos[1]].pheronomeIntensity > maxPheronomeIntensity) {
-					return [[ line, col ] as TCoord];
+					return [[line, col] as TCoord];
 				} else if (enviroment[calculatedPos[0]][calculatedPos[1]].pheronomeIntensity === maxPheronomeIntensity) {
-					return [...acc, [ line, col ] as TCoord];
+					return [...acc, [line, col] as TCoord];
 				}
 			}
 		}
